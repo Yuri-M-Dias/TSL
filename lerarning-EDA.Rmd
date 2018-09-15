@@ -31,20 +31,27 @@ model %>%
 
 model %>% compile(
   loss = 'mse',
-  optimizer = optimizer_adam()
+  optimizer = optimizer_adam(),
+  metrics = list("mean_absolute_error")
 )
 
 slwm = as.matrix(slw)
+slwm.train = slwm[1:69,]
+slwm.test = slwm[69:92,]
+
+# The patience parameter is the amount of epochs to check for improvement.
+early_stop <- callback_early_stopping(monitor = "val_loss", patience = 20)
 
 history <- model %>% fit(
-  x = slwm[,1:3],
-  y = slwm[,4],
+  x = slwm.train[,1:3],
+  y = slwm.train[,4],
   epochs = 2000,
+  callbacks = list(early_stop),
   verbose = 2
 )
 
-x_test = array_reshape(c(50,60,70), c(1,3))
-model %>% predict(x_test)
+model %>% evaluate(x = slwm.test[,1:3], y = slwm.test[,4])
+
 ```
 
 
