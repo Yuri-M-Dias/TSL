@@ -12,11 +12,11 @@ library(tidyverse)
 data = fread('./Data/daily-total-female-births.csv')
 
 slw = as.data.table(
-  matrix(data$Births, ncol = 4,  byrow = TRUE),
+  matrix(data$Births, ncol = 5,  byrow = TRUE),
   stringsAsFactors = FALSE
 )
 
-slw = slw[,.(nextValue = V4), by = list(V1,V2,V3)]
+slw = slw[,.(nextValue = V5), by = list(V1,V2,V3,V4)]
 ```
 
 Great!
@@ -26,31 +26,55 @@ library(keras)
 
 model <- keras_model_sequential() 
 model %>% 
-  layer_dense(units = 100, activation = 'relu', input_shape = 3) %>% 
+  layer_dense(units = 64, activation = 'relu', input_shape = 4) %>% 
+  layer_dense(units = 32, activation = 'relu') %>% 
+  layer_dense(units = 6, activation = 'relu') %>% 
   layer_dense(units = 1)
 
 model %>% compile(
   loss = 'mse',
   optimizer = optimizer_adam(),
-  metrics = list("mean_absolute_error")
+  metrics = c('mae')
 )
+summary(model)
+```
 
+```{r, echo=F,eval=F}
 slwm = as.matrix(slw)
-slwm.train = slwm[1:69,]
-slwm.test = slwm[69:92,]
+slwm.train = slwm[1:58,]
+slwm.test = slwm[59:73,]
 
 # The patience parameter is the amount of epochs to check for improvement.
-early_stop <- callback_early_stopping(monitor = "val_loss", patience = 20)
+early_stop <- callback_early_stopping(
+  monitor = "val_loss", patience = 20
+)
 
 history <- model %>% fit(
-  x = slwm.train[,1:3],
-  y = slwm.train[,4],
+  x = slwm.train[,1:4],
+  y = slwm.train[,5],
+  batch_size = 2,
   epochs = 2000,
   callbacks = list(early_stop),
   verbose = 2
 )
 
-model %>% evaluate(x = slwm.test[,1:3], y = slwm.test[,4])
+```
+
+```{r}
+model %>% evaluate(x = slwm.train[,1:4], y = slwm.train[,5])
+model %>% evaluate(x = slwm.test[,1:4], y = slwm.test[,5])
+
+predictions = model %>% predict_on_batch(slwm.test[,1:4])
+preds = data.table(real = slwm.test[,5], pred = predictions)
+```
+
+```{r}
+ggplot(
+  preds,
+  aes(x = as.numeric(row.names(preds)))
+) +
+  geom_point(aes(y = real), color = 'green') +
+  geom_point(aes(y = pred.V1), color = 'red')
 
 ```
 
